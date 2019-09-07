@@ -3,13 +3,13 @@ var express = require('express');
 var session = require('express-session');
 var bodyParser = require('body-parser');
 var path = require('path');
+var PORT = process.env.PORT || 8000;
 
-var connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'login'
-});
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
+var connection = mysql.createConnection(process.env.JAWSDB_URL);
 
 var app = express();
 
@@ -100,4 +100,4 @@ app.get('/logout', (req, res) => {
   });
 });
 
-app.listen(8000);
+app.listen(PORT);
