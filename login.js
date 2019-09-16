@@ -25,9 +25,6 @@ app.get('/', function(request, response) {
   response.sendFile(path.join(__dirname + '/login.html'));
 });
 
-// This is a middleware function we can use it as a second arguments in all our routes that need auth
-// the next function will just allow the route to continue with the normal functioning of the route
-// Otherwise if the user is not logged in (no active session) the will be redirected to '/' (login screen)
 function isAuthenticated(req, res, next) {
   if (req.session.loggedin) {
     return next();
@@ -65,24 +62,13 @@ app.post('/auth', function(request, response) {
 });
 
 app.get('/dashboard', isAuthenticated, function(request, response) {
-  // I would use request.session.birthday here as a param in your external API url
-  // and then assemble it in the packet for the with username, etc
-  // maybe something like this
-
-  // var data = {
-  //   username: req.session.username,
-  //   // apiResponse would be the response from the external API and I'm just making up the keys
-  //   currentHoroscope: apiResponse.todaysHoroscope
-  // };
   response.send('Welcome back, ' + request.session.username);
 });
 
-// just an extra route to to test request session data
 app.get('/anotherTest', isAuthenticated, function(request, response) {
   response.send('Another example, ' + request.session.username + '!');
 });
 
-// This can be attached to a logout button anywhere in your views with an onclick listener
 app.get('/logout', (req, res) => {
   req.session.destroy(function() {
     res.redirect('/');
