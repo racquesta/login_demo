@@ -1,4 +1,3 @@
-var mysql = require('mysql');
 var express = require('express');
 var session = require('express-session');
 var bodyParser = require('body-parser');
@@ -8,14 +7,13 @@ var PORT = process.env.PORT || 8000;
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
+const app = express();
 
-var connection = mysql.createConnection(process.env.JAWSDB_URL);
-
-var app = express();
+const db = require('./models');
 
 app.use(
   session({
-    secret: 'secret',
+    secret: process.env.SESSION_SECRET,
     resave: true,
     saveUninitialized: true
   })
@@ -37,33 +35,29 @@ function isAuthenticated(req, res, next) {
   res.redirect('/');
 }
 
-function isManager(req, res, next) {
-  if (req.session.role == 'manager') {
-    return next();
-  }
-  res.send('You must be a manager to view this page!');
-}
-
 app.post('/auth', function(request, response) {
   var username = request.body.username;
   var password = request.body.password;
+  var userData;
   if (username && password) {
-    connection.query(
-      'SELECT * FROM accounts WHERE username = ? AND password = ?',
-      [username, password],
-      function(error, results, fields) {
-        if (results.length > 0) {
-          // save keys on the session object to access throughout your routes
-          request.session.loggedin = true;
-          request.session.username = username;
-          request.session.birthday = results[0].birthday;
-          response.redirect('/dashboard');
-        } else {
-          response.send('Incorrect Username and/or Password!');
+    db.User.findOne({ where: { userName: username } })
+      .then(user => {
+        if (!user) {
+          response.send('User does not exist!');
         }
+        userData = user;
+        return user;
+      })
+      .then(user => user.validPassword(password))
+      .then(result => {
+        if (result) {
+          request.session.loggedin = true;
+          request.session.username = userData.userName;
+          response.redirect('/dashboard');
+        }
+        response.send('Invalid Login!');
         response.end();
-      }
-    );
+      });
   } else {
     response.send('Please enter Username and Password!');
     response.end();
@@ -80,12 +74,7 @@ app.get('/dashboard', isAuthenticated, function(request, response) {
   //   // apiResponse would be the response from the external API and I'm just making up the keys
   //   currentHoroscope: apiResponse.todaysHoroscope
   // };
-  response.send(
-    'Welcome back, ' +
-      request.session.username +
-      '! Your brthday is' +
-      request.session.birthday
-  );
+  response.send('Welcome back, ' + request.session.username);
 });
 
 // just an extra route to to test request session data
