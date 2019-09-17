@@ -18,55 +18,50 @@ app.use(
     saveUninitialized: true
   })
 );
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.get('/', function(request, response) {
-  response.sendFile(path.join(__dirname + '/login.html'));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname + '/login.html'));
 });
 
-function isAuthenticated(req, res, next) {
-  if (req.session.loggedin) {
+const isAuthenticated = (req, res, next) => {
+  if (req.session.user) {
     return next();
   }
   res.redirect('/');
-}
+};
 
-app.post('/auth', function(request, response) {
-  var username = request.body.username;
-  var password = request.body.password;
-  var userData;
+app.post('/auth', async (req, res) => {
+  const { username, password } = req.body;
   if (username && password) {
-    db.User.findOne({ where: { userName: username } })
-      .then(user => {
-        if (!user) {
-          response.send('User does not exist!');
-        }
-        userData = user;
-        return user;
-      })
-      .then(user => user.validPassword(password))
-      .then(result => {
-        if (result) {
-          request.session.loggedin = true;
-          request.session.username = userData.userName;
-          response.redirect('/dashboard');
-        }
-        response.send('Invalid Login!');
-        response.end();
-      });
+    try {
+      const user = await db.User.findOne({ where: { userName: username } });
+      const validPassword = await user.validPassword(password);
+      if (validPassword) {
+        const { userName, email } = user;
+        req.session.user = {
+          userName,
+          email
+        };
+        res.redirect('/dashboard');
+      }
+      throw new Error('Incorrect Password');
+    } catch (err) {
+      res.send('Incorrect Username or Password');
+    }
   } else {
     response.send('Please enter Username and Password!');
-    response.end();
   }
 });
 
 app.get('/dashboard', isAuthenticated, function(request, response) {
-  response.send('Welcome back, ' + request.session.username);
+  response.send('Welcome back, ' + request.session.user.userName);
 });
 
 app.get('/anotherTest', isAuthenticated, function(request, response) {
-  response.send('Another example, ' + request.session.username + '!');
+  response.send('Another example, ' + request.session.user.userName + '!');
 });
 
 app.get('/logout', (req, res) => {
@@ -75,4 +70,6 @@ app.get('/logout', (req, res) => {
   });
 });
 
-app.listen(PORT);
+app.listen(PORT, () => {
+  console.log(`Listening on Port ${PORT}`);
+});
