@@ -1,39 +1,46 @@
-var express = require('express');
-var session = require('express-session');
-var bodyParser = require('body-parser');
-var path = require('path');
-var PORT = process.env.PORT || 8000;
+const express = require("express");
+const bodyParser = require("body-parser");
+const jwt = require("jsonwebtoken");
+const path = require("path");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const PORT = process.env.PORT || 8000;
 
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
 }
 const app = express();
 
-const db = require('./models');
-
+const db = require("./models");
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: true,
-    saveUninitialized: true
+  cors({
+    origin: process.env.ALLOWED_ORIGIN,
+    credentials: true
   })
 );
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname + '/login.html'));
-});
+app.use(cookieParser());
 
 const isAuthenticated = (req, res, next) => {
-  if (req.session.user) {
-    return next();
+  const token = req.cookies.Authorization.replace(/^Bearer /, "");
+  console.log(token);
+  if (token) {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Expired Token" });
+      } else {
+        const { userName, email } = decoded;
+        return res.status(200).json({ success: true, userName, email });
+      }
+    });
   }
-  res.redirect('/');
 };
 
-app.post('/auth', async (req, res) => {
+app.post("/auth", async (req, res) => {
   const { username, password } = req.body;
   if (username && password) {
     try {
@@ -41,32 +48,33 @@ app.post('/auth', async (req, res) => {
       const validPassword = await user.validPassword(password);
       if (validPassword) {
         const { userName, email } = user;
-        req.session.user = {
-          userName,
-          email
-        };
-        res.redirect('/dashboard');
+        const token = jwt.sign({ userName, email }, process.env.JWT_SECRET, {
+          expiresIn: "1h"
+        });
+
+        res
+          .cookie("Authorization", `Bearer ${token}`, {
+            httpOnly: true
+          })
+          .json({ success: true, userName, email });
       }
-      throw new Error('Incorrect Password');
     } catch (err) {
-      res.send('Incorrect Username or Password');
+      res
+        .status(401)
+        .json({ success: false, message: "Invalid username and/or password." });
     }
   } else {
-    response.send('Please enter Username and Password!');
+    res
+      .status(401)
+      .json({ success: false, message: "Missing username or password." });
   }
 });
 
-app.get('/dashboard', isAuthenticated, function(request, response) {
-  response.send('Welcome back, ' + request.session.user.userName);
-});
+app.get("/validate", isAuthenticated);
 
-app.get('/anotherTest', isAuthenticated, function(request, response) {
-  response.send('Another example, ' + request.session.user.userName + '!');
-});
-
-app.get('/logout', (req, res) => {
+app.get("/logout", (req, res) => {
   req.session.destroy(function() {
-    res.redirect('/');
+    res.redirect("/");
   });
 });
 

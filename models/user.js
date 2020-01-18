@@ -1,16 +1,16 @@
-'use strict';
-const bcrypt = require('bcrypt');
+"use strict";
+const bcrypt = require("bcrypt");
 
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define(
-    'User',
+    "User",
     {
       userName: {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
           len: [1, 30],
-          msg: 'Username must be under 30 characters.'
+          msg: "Username must be under 30 characters."
         },
         unique: true
       },
